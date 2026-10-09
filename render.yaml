@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: mgmcen-hall-booking
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: s25_suryawanshi_sanket@mgmcen.ac.in
+      - key: ADMIN_PASSWORD
+        value: Sanket@123
