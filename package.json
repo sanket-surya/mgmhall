@@ -1,0 +1,26 @@
+{
+  "name": "mgm-cen-conference-hall-portal",
+  "version": "1.0.0",
+  "description": "MGM's College Of Engineering Nanded - Sir Vishveshwarya Conference Hall Booking Portal",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Ready for production\" && exit 0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "nodemailer": "^10.0.15",
+    "xlsx": "^0.18.5"
+  }
+}

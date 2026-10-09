@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Sir Vishveshwarya Conference Hall - MGMCEN</title>
+  <meta name="description" content="MGM's College Of Engineering Nanded - Sir Vishveshwarya Conference Hall Reservation Dashboard.">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div style="width: 44px; height: 44px; border-radius: 50%; overflow: hidden; border: 2px solid #f59e0b; display: flex; align-items: center; justify-content: center; background: #ffffff;">
+          <img src="/images/mgm_official_logo.jpg" alt="MGM College Logo" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div class="brand-text">
+          <h1>MGM's College Of Engineering Nanded</h1>
+          <span>Sir Vishveshwarya Conference Hall Portal</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="text-align: right; line-height: 1.3;">
+          <div id="userFullName" style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">Loading User...</div>
+          <div id="userDeptBadge" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Faculty</div>
+        </div>
+        <button onclick="handleLogout()" class="btn btn-outline-dark btn-sm" id="btnLogout">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Global Alert Container -->
+  <div class="container" style="padding-top: 20px; padding-bottom: 0;">
+    <div id="dashboardAlert" style="display: none;" class="alert" role="alert"></div>
+  </div>
+
+  <!-- Main Content Area -->
+  <main class="container">
+
+    <!-- ADMIN PANEL VIEW (Visible if role === 'admin') -->
+    <div id="adminPanel" style="display: none; margin-bottom: 40px;">
+      
+      <!-- Admin Header with Excel Export Button -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h2><i class="fas fa-shield-alt" style="color: var(--accent);"></i> Administration Dashboard</h2>
+          <p style="color: var(--text-muted);">Manage reservation requests for Sir Vishveshwarya Conference Hall and sync with Excel.</p>
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="btn btn-outline-dark" onclick="openSmtpModal()">
+            <i class="fas fa-envelope-open-text"></i> Email Notification Settings
+          </button>
+          <a href="/api/admin/export-excel" class="btn btn-success" download style="background: #059669;">
+            <i class="fas fa-file-excel"></i> Download Excel Sheet (.xlsx)
+          </a>
+        </div>
+      </div>
+
+      <!-- Live Data Storage & Excel Sync Info Banner -->
+      <div class="card" style="margin-bottom: 24px; background: #f0fdf4; border: 1.5px solid #bbf7d0; padding: 16px 20px;">
+        <div style="display: flex; align-items: flex-start; gap: 14px;">
+          <i class="fas fa-database" style="font-size: 1.6rem; color: #16a34a; margin-top: 3px;"></i>
+          <div>
+            <h4 style="color: #15803d; margin-bottom: 4px;">Data Storage & Automatic Excel Synchronization Active</h4>
+            <p style="font-size: 0.88rem; color: #166534; margin: 0; line-height: 1.5;">
+              • <strong>Database Storage:</strong> Stored locally in SQLite at <code>mgm/data/mgm.sqlite</code><br>
+              • <strong>Excel File:</strong> Directly synchronized at <code>mgm/data/Approved_Bookings_MGMCEN.xlsx</code><br>
+              • <strong>Automatic Sync:</strong> Every time you click <strong>Approve (✔)</strong> on a faculty request, the record is immediately written into the Excel sheet.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Stats Grid -->
+      <div class="stats-grid" style="margin-bottom: 28px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+        <div class="card" style="text-align: center;">
+          <h3 id="statTotalBookings" style="font-size: 2.2rem; color: var(--primary);">0</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Total Requests</p>
+        </div>
+        <div class="card" style="text-align: center; border-left: 4px solid var(--warning);">
+          <h3 id="statPendingBookings" style="font-size: 2.2rem; color: var(--warning);">0</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Pending Hall Bookings</p>
+        </div>
+        <div class="card" style="text-align: center; border-left: 4px solid var(--success);">
+          <h3 id="statApprovedBookings" style="font-size: 2.2rem; color: var(--success);">0</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Approved (In Excel)</p>
+        </div>
+        <div class="card" style="text-align: center; border-left: 4px solid #f59e0b;">
+          <h3 id="statPendingFaculty" style="font-size: 2.2rem; color: #f59e0b;">0</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Pending Faculty Approvals</p>
+        </div>
+        <div class="card" style="text-align: center;">
+          <h3 id="statTotalFaculty" style="font-size: 2.2rem; color: var(--primary);">0</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Active Faculty</p>
+        </div>
+      </div>
+
+      <!-- Security Key Management Card -->
+      <div class="card" style="margin-bottom: 28px; background: #fffbeb; border: 1.5px solid #fde68a;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h4 style="color: #92400e; margin-bottom: 4px;"><i class="fas fa-key"></i> Institutional Faculty Authorization Key</h4>
+            <p style="font-size: 0.88rem; color: #b45309; margin: 0;">
+              Only personnel with this key can register faculty accounts and book halls. Prevents unauthorized student reservations.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="text" id="adminFacultyKeyInput" class="form-control" style="width: 200px; font-weight: 700; letter-spacing: 0.5px;">
+            <button class="btn btn-primary btn-sm" onclick="saveAdminFacultyKey()"><i class="fas fa-save"></i> Update Key</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Faculty Registration Approvals Card -->
+      <div class="card" style="margin-bottom: 28px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="margin: 0;"><i class="fas fa-user-clock" style="color: #f59e0b;"></i> Pending Faculty Approvals (नवीन शिक्षक नोंदणी मंजुरी)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0;">
+              Review and approve newly registered professors before granting hall booking privileges.
+            </p>
+          </div>
+          <span id="pendingFacultyBadge" class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 0.82rem; padding: 6px 14px; border-radius: 9999px; font-weight: 700;">
+            0 Awaiting Review
+          </span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Faculty Name</th>
+                <th>Official Email</th>
+                <th>Department / Branch</th>
+                <th>Faculty ID</th>
+                <th>Contact</th>
+                <th>Registered On</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="adminFacultyTableBody">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading pending registrations...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- All Bookings Approval Table -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+          <h3><i class="fas fa-clipboard-list"></i> Hall Reservation Requests (Approve to Export to Excel)</h3>
+          <a href="/api/admin/export-excel" class="btn btn-outline-dark btn-sm" download>
+            <i class="fas fa-download"></i> Export Excel
+          </a>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Booking Ref</th>
+                <th>Hall & Venue</th>
+                <th>Faculty / Department</th>
+                <th>Event Title</th>
+                <th>Date & Slot</th>
+                <th>Attendees</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="adminBookingsTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading reservations...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FACULTY PORTAL VIEW (Visible for faculty & admin) -->
+    <div id="facultyPanel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h2><i class="fas fa-calendar-alt" style="color: var(--accent);"></i> Sir Vishveshwarya Conference Hall Booking</h2>
+          <p style="color: var(--text-muted);">MGM's College Of Engineering Nanded • Check slot availability and reserve hall.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openBookingModal()">
+          <i class="fas fa-plus-circle"></i> Reserve Sir Vishveshwarya Hall
+        </button>
+      </div>
+
+      <!-- Hall Feature Showcase Banner -->
+      <div class="card" style="margin-bottom: 32px; padding: 0; display: flex; flex-direction: row; flex-wrap: wrap; overflow: hidden;">
+        <div style="flex: 1 1 350px; min-height: 240px; position: relative;">
+          <img src="/images/auditorium.jpg" alt="Sir Vishveshwarya Conference Hall" style="width: 100%; height: 100%; object-fit: cover;">
+          <span style="position: absolute; top: 14px; left: 14px; background: rgba(15, 39, 68, 0.9); color: #fff; padding: 4px 12px; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 700;">
+            <i class="fas fa-users"></i> 350 Seating Capacity
+          </span>
+        </div>
+        <div style="flex: 2 1 400px; padding: 28px; display: flex; flex-direction: column; justify-content: center;">
+          <div style="display: inline-block; color: var(--accent); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; margin-bottom: 6px;">
+            Premier Academic Venue
+          </div>
+          <h3 style="font-size: 1.5rem; margin-bottom: 10px;">Sir Vishveshwarya Conference Hall</h3>
+          <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 16px;">
+            Located at the Administrative & Academic Block, MGM College Of Engineering Nanded. Acoustically treated auditorium equipped with high-definition laser projectors, digital surround sound, central air conditioning, and video conferencing capabilities.
+          </p>
+          <div>
+            <button class="btn btn-primary btn-sm" onclick="openBookingModal()">
+              <i class="fas fa-calendar-check"></i> Check Availability & Book Now
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- User's My Bookings Table -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3><i class="fas fa-history"></i> My Reservation History</h3>
+          <button class="btn btn-outline-dark btn-sm" onclick="loadMyBookings()">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Hall Name</th>
+                <th>Event Title</th>
+                <th>Date</th>
+                <th>Time Slot</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="myBookingsTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading your bookings...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- BOOKING MODAL -->
+  <div class="modal-overlay" id="bookingModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-calendar-plus" style="color: var(--accent);"></i> Reserve Conference Hall</h3>
+        <button class="modal-close" onclick="closeBookingModal()">&times;</button>
+      </div>
+
+      <div id="modalAlert" style="display: none;" class="alert"></div>
+
+      <form id="bookingForm" onsubmit="submitBooking(event)">
+        <!-- Select Hall -->
+        <div class="form-group">
+          <label class="form-label" for="bookHall"><i class="fas fa-landmark"></i> Select Venue</label>
+          <select id="bookHall" class="form-control" required onchange="checkSlotAvailability()">
+            <option value="" disabled selected>-- Select Venue --</option>
+          </select>
+        </div>
+
+        <!-- Event Title -->
+        <div class="form-group">
+          <label class="form-label" for="bookEventTitle"><i class="fas fa-heading"></i> Event Title / Topic</label>
+          <input type="text" id="bookEventTitle" class="form-control" placeholder="e.g., National Seminar on Advanced AI Architectures" required>
+        </div>
+
+        <!-- Event Type & Department Dropdown -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="bookEventType"><i class="fas fa-tag"></i> Event Type</label>
+            <select id="bookEventType" class="form-control" required>
+              <option value="Guest Lecture">Guest Lecture</option>
+              <option value="Workshop">Technical Workshop</option>
+              <option value="National Conference">National Conference</option>
+              <option value="Seminar">Academic Seminar</option>
+              <option value="Faculty Development (FDP)">Faculty Development (FDP)</option>
+              <option value="Department Meeting">Department Meeting</option>
+              <option value="Cultural / Convocations">Cultural / Convocation</option>
+            </select>
+          </div>
+
+          <!-- STANDARDIZED BRANCH / DEPARTMENT DROPDOWN -->
+          <div class="form-group">
+            <label class="form-label" for="bookDept"><i class="fas fa-graduation-cap"></i> Organizing Department</label>
+            <select id="bookDept" class="form-control" required>
+              <option value="Computer Science & Engineering (CSE)">Computer Science & Engineering (CSE)</option>
+              <option value="Artificial Intelligence & Data Science (AI & DS)">Artificial Intelligence & Data Science (AI & DS)</option>
+              <option value="Automation & Robotics (A&R)">Automation & Robotics (A&R)</option>
+              <option value="Information Technology (IT)">Information Technology (IT)</option>
+              <option value="Electronics & Telecommunication (ENTC)">Electronics & Telecommunication (ENTC)</option>
+              <option value="Mechanical Engineering (MECH)">Mechanical Engineering (MECH)</option>
+              <option value="Civil Engineering (CIVIL)">Civil Engineering (CIVIL)</option>
+              <option value="Electrical Engineering (EE)">Electrical Engineering (EE)</option>
+              <option value="Chemical Engineering (CHEM)">Chemical Engineering (CHEM)</option>
+              <option value="Applied Sciences & Humanities (FE)">Applied Sciences & Humanities (FE)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Date & Times -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="bookDate"><i class="fas fa-calendar-day"></i> Date</label>
+            <input type="date" id="bookDate" class="form-control" required onchange="checkSlotAvailability()">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="bookStartTime"><i class="fas fa-clock"></i> Start Time</label>
+            <input type="time" id="bookStartTime" class="form-control" required value="09:30">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="bookEndTime"><i class="fas fa-clock"></i> End Time</label>
+            <input type="time" id="bookEndTime" class="form-control" required value="13:00">
+          </div>
+        </div>
+
+        <!-- Real-time Availability Display Box -->
+        <div id="availabilityPreview" style="display: none; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 18px;">
+          <span style="font-weight: 700; font-size: 0.82rem; color: var(--primary); text-transform: uppercase;">
+            <i class="fas fa-info-circle"></i> Existing Reservations for Selected Date:
+          </span>
+          <div id="availabilitySlotsList" style="margin-top: 6px; font-size: 0.85rem; color: var(--text-muted);"></div>
+        </div>
+
+        <!-- Expected Attendees & Requirements -->
+        <div class="form-group">
+          <label class="form-label" for="bookAttendees"><i class="fas fa-users"></i> Expected Attendees</label>
+          <input type="number" id="bookAttendees" class="form-control" placeholder="e.g. 150" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="bookRequirements"><i class="fas fa-tools"></i> Audio/Visual & Special Setup Requirements</label>
+          <textarea id="bookRequirements" class="form-control" rows="2" placeholder="e.g. 2 Cordless mics, stage podium, projector with HDMI connection"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-outline-dark" onclick="closeBookingModal()">Cancel</button>
+          <button type="submit" id="btnSubmitBooking" class="btn btn-primary">
+            <i class="fas fa-check-circle"></i> Submit Reservation Request
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SMTP EMAIL CONFIGURATION MODAL (Admin Only) -->
+  <div class="modal-overlay" id="smtpModal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-envelope-open-text" style="color: var(--accent);"></i> Email & Reminder Settings</h3>
+        <button class="modal-close" onclick="closeSmtpModal()">&times;</button>
+      </div>
+
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; font-size: 0.85rem; color: #1e40af;">
+        <strong><i class="fas fa-info-circle"></i> Google / College Webmail SMTP:</strong><br>
+        Enter your Gmail / College email and Google 16-digit <em>App Password</em> to automatically dispatch booking confirmations, approval notices, and event reminders to faculty.
+      </div>
+
+      <form onsubmit="saveSmtpSettings(event)">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">SMTP Host</label>
+            <input type="text" id="smtpHost" class="form-control" value="smtp.gmail.com" required placeholder="smtp.gmail.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Port</label>
+            <input type="number" id="smtpPort" class="form-control" value="587" required placeholder="587">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Sender Email (Gmail / College ID)</label>
+          <input type="email" id="smtpUser" class="form-control" required placeholder="s25_suryawanshi_sanket@mgmcen.ac.in">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Google App Password (16 characters)</label>
+          <input type="password" id="smtpPass" class="form-control" placeholder="••••••••••••••••">
+          <span class="form-hint">Generated in Google Account ➔ Security ➔ 2-Step Verification ➔ App Passwords.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Sender Display Name</label>
+          <input type="text" id="smtpSenderName" class="form-control" value="MGM's College Of Engineering Nanded" required>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-outline-dark" onclick="closeSmtpModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Email Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

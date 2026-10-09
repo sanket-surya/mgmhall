@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2744" />
+      <stop offset="50%" stop-color="#143156" />
+      <stop offset="100%" stop-color="#09182b" />
+    </linearGradient>
+    <linearGradient id="goldAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="innerDisk" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a5f" />
+      <stop offset="100%" stop-color="#0d213a" />
+    </linearGradient>
+    <filter id="badgeShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Outer Ring with Golden Border -->
+  <circle cx="180" cy="180" r="168" fill="url(#shieldGrad)" stroke="url(#goldAccent)" stroke-width="8" filter="url(#badgeShadow)"/>
+  <circle cx="180" cy="180" r="154" fill="none" stroke="#d97706" stroke-width="1.8" stroke-dasharray="6 3"/>
+
+  <!-- Inner Circle -->
+  <circle cx="180" cy="180" r="115" fill="url(#innerDisk)" stroke="url(#goldAccent)" stroke-width="4"/>
+
+  <!-- Top Curved Text: MAHATMA GANDHI MISSION -->
+  <path id="curveTop" d="M 44 180 A 136 136 0 0 1 316 180" fill="none"/>
+  <text fill="#ffffff" font-family="'Outfit', 'Segoe UI', Arial, sans-serif" font-size="14.5" font-weight="800" letter-spacing="2.2">
+    <textPath href="#curveTop" startOffset="50%" text-anchor="middle">
+      MAHATMA GANDHI MISSION
+    </textPath>
+  </text>
+
+  <!-- Bottom Curved Text: COLLEGE OF ENGG. NANDED (ESTD 1984) -->
+  <path id="curveBottom" d="M 316 180 A 136 136 0 0 1 44 180" fill="none"/>
+  <text fill="#fde68a" font-family="'Outfit', 'Segoe UI', Arial, sans-serif" font-size="13.5" font-weight="800" letter-spacing="1.8">
+    <textPath href="#curveBottom" startOffset="50%" text-anchor="middle">
+      ★ COLLEGE OF ENGG. NANDED • 1984 ★
+    </textPath>
+  </text>
+
+  <!-- Central Engineering Gear Symbol (Engineering & Technology) -->
+  <g transform="translate(180, 168) scale(1.1)" fill="url(#goldAccent)">
+    <!-- Gear teeth -->
+    <path d="M-8,-42 L8,-42 L6,-32 L-6,-32 Z"/>
+    <path d="M-8,42 L8,42 L6,32 L-6,32 Z"/>
+    <path d="M-42,-8 L-42,8 L-32,6 L-32,-6 Z"/>
+    <path d="M42,-8 L42,8 L32,6 L32,-6 Z"/>
+    <path d="M-30,-30 L-18,-38 L-15,-29 L-25,-23 Z"/>
+    <path d="M30,30 L18,38 L15,29 L25,23 Z"/>
+    <path d="M-30,30 L-38,18 L-29,15 L-23,25 Z"/>
+    <path d="M30,-30 L38,-18 L29,-15 L23,-25 Z"/>
+    <!-- Gear Ring -->
+    <circle cx="0" cy="0" r="32" fill="none" stroke="url(#goldAccent)" stroke-width="5.5"/>
+  </g>
+
+  <!-- Academic Flame / Lamp of Wisdom -->
+  <g transform="translate(180, 142)">
+    <path d="M0,-24 C6,-15 14,-10 10,-2 C8,5 -8,5 -10,-2 C-14,-10 -6,-15 0,-24 Z" fill="#fbbf24"/>
+    <path d="M0,-18 C3,-12 8,-8 5,-2 C4,3 -4,3 -5,-2 C-8,-8 -3,-12 0,-18 Z" fill="#ef4444"/>
+    <path d="M-6,4 L6,4 L4,16 L-4,16 Z" fill="url(#goldAccent)"/>
+    <rect x="-8" y="2" width="16" height="3" rx="1" fill="#ffffff"/>
+  </g>
+
+  <!-- Open Book of Knowledge -->
+  <g transform="translate(180, 184)" fill="#ffffff" stroke="#0f2744" stroke-width="1.2">
+    <path d="M-30,2 C-15,-3 0,4 0,4 L0,22 C0,22 -15,16 -30,20 Z" fill="#f8fafc"/>
+    <path d="M30,2 C15,-3 0,4 0,4 L0,22 C0,22 15,16 30,20 Z" fill="#f8fafc"/>
+    <line x1="0" y1="4" x2="0" y2="24" stroke="url(#goldAccent)" stroke-width="2.5"/>
+  </g>
+
+  <!-- Trust Motto Banner (MGM) -->
+  <rect x="125" y="222" width="110" height="28" rx="14" fill="url(#shieldGrad)" stroke="url(#goldAccent)" stroke-width="2.2"/>
+  <text x="180" y="241" fill="#ffffff" font-family="'Outfit', 'Segoe UI', Arial, sans-serif" font-size="17" font-weight="900" letter-spacing="3.5" text-anchor="middle">
+    MGM
+  </text>
+</svg>
