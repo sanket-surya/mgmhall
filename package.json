@@ -4,7 +4,7 @@
   "description": "MGM's College Of Engineering Nanded - Sir Vishveshwarya Conference Hall Booking Portal",
   "main": "server.js",
   "engines": {
-    "node": ">=22.5.0"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node server.js",
