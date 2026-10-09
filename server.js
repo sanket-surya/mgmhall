@@ -6,7 +6,12 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
-const { syncApprovedBookingsToExcel, getExcelFilePath } = require('./excelService');
+const { 
+  syncApprovedBookingsToExcel, 
+  getExcelFilePath, 
+  syncFacultyToExcel, 
+  getFacultyExcelPath 
+} = require('./excelService');
 const {
   getSmtpConfig,
   sendBookingRequestNotification,
@@ -180,6 +185,12 @@ app.post('/api/auth/register', (req, res) => {
       faculty_id.trim().toUpperCase(),
       phone ? phone.trim() : ''
     );
+
+    // Automatically update Faculty Excel sheet
+    try {
+      const allFaculty = db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      syncFacultyToExcel(allFaculty);
+    } catch (e) {}
 
     // Registration requires admin approval: do NOT auto-login
     return res.json({
@@ -669,6 +680,34 @@ app.get('/api/admin/export-excel', requireAdmin, (req, res) => {
   }
 });
 
+// Admin: Export/Download Registered Faculty List directly as Excel (.xlsx)
+app.get('/api/admin/export-faculty-excel', requireAdmin, (req, res) => {
+  try {
+    const allFaculty = db.prepare(`
+      SELECT * FROM users 
+      WHERE role = 'faculty'
+      ORDER BY department ASC, name ASC
+    `).all();
+
+    syncFacultyToExcel(allFaculty);
+
+    const filePath = getFacultyExcelPath();
+    if (fs.existsSync(filePath)) {
+      return res.download(filePath, 'MGM_Nanded_Registered_Professors.xlsx');
+    } else {
+      return res.status(404).json({
+        success: false,
+        message: 'System issue: No registered faculty available to export.'
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'System issue exporting faculty Excel data.'
+    });
+  }
+});
+
 // -------------------------------------------------------------
 // ADMIN FACULTY APPROVAL & MANAGEMENT
 // -------------------------------------------------------------
@@ -726,6 +765,12 @@ app.patch('/api/admin/faculty/:id/approve', requireAdmin, async (req, res) => {
 
     db.prepare("UPDATE users SET status = 'approved' WHERE id = ?").run(facultyId);
 
+    // Sync updated status to Faculty Excel sheet
+    try {
+      const allFaculty = db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      syncFacultyToExcel(allFaculty);
+    } catch (e) {}
+
     // Send email notification to the faculty member (Safe background fire-and-forget)
     sendFacultyApprovedNotification(user).catch(() => {});
 
@@ -755,6 +800,12 @@ app.patch('/api/admin/faculty/:id/reject', requireAdmin, (req, res) => {
     }
 
     db.prepare("UPDATE users SET status = 'rejected' WHERE id = ?").run(facultyId);
+
+    // Sync updated status to Faculty Excel sheet
+    try {
+      const allFaculty = db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      syncFacultyToExcel(allFaculty);
+    } catch (e) {}
 
     return res.json({
       success: true,

@@ -72,11 +72,63 @@ function syncApprovedBookingsToExcel(approvedBookings) {
   }
 }
 
+const FACULTY_EXCEL_PATH = path.join(__dirname, 'data', 'Registered_Faculty_MGMCEN.xlsx');
+
+/**
+ * Syncs all faculty registrations into the Faculty Excel sheet
+ * @param {Array} facultyList - List of registered faculty records
+ */
+function syncFacultyToExcel(facultyList) {
+  try {
+    const rows = facultyList.map((f, index) => ({
+      'Sr. No.': index + 1,
+      'Faculty Name': f.name,
+      'Official Email': f.email,
+      'Academic Department': f.department,
+      'Faculty ID': f.faculty_id || 'N/A',
+      'Contact Mobile': f.phone || 'N/A',
+      'Approval Status': (f.status || 'pending').toUpperCase(),
+      'Registration Timestamp': f.created_at || 'N/A'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 8 },  // Sr No
+      { wch: 25 }, // Name
+      { wch: 32 }, // Email
+      { wch: 36 }, // Dept
+      { wch: 18 }, // Faculty ID
+      { wch: 16 }, // Phone
+      { wch: 18 }, // Status
+      { wch: 24 }  // Timestamp
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Registered Professors');
+
+    const dir = path.dirname(FACULTY_EXCEL_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    XLSX.writeFile(workbook, FACULTY_EXCEL_PATH);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 function getExcelFilePath() {
   return EXCEL_FILE_PATH;
 }
 
+function getFacultyExcelPath() {
+  return FACULTY_EXCEL_PATH;
+}
+
 module.exports = {
   syncApprovedBookingsToExcel,
-  getExcelFilePath
+  getExcelFilePath,
+  syncFacultyToExcel,
+  getFacultyExcelPath
 };
