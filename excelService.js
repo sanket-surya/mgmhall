@@ -2,7 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 
-const EXCEL_FILE_PATH = path.join(__dirname, 'data', 'Approved_Bookings_MGMCEN.xlsx');
+const dataDir = process.env.VERCEL
+  ? path.join('/tmp', 'data')
+  : path.join(__dirname, 'data');
+
+const EXCEL_FILE_PATH = path.join(dataDir, 'Approved_Bookings_MGMCEN.xlsx');
 
 /**
  * Syncs all approved bookings into the Excel sheet
@@ -72,7 +76,7 @@ function syncApprovedBookingsToExcel(approvedBookings) {
   }
 }
 
-const FACULTY_EXCEL_PATH = path.join(__dirname, 'data', 'Registered_Faculty_MGMCEN.xlsx');
+const FACULTY_EXCEL_PATH = path.join(dataDir, 'Registered_Faculty_MGMCEN.xlsx');
 
 /**
  * Syncs all faculty registrations into the Faculty Excel sheet

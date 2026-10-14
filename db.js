@@ -1,16 +1,18 @@
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, 'data');
+// Use /tmp on Vercel (read-only filesystem), local ./data otherwise
+const dataDir = process.env.VERCEL
+  ? path.join('/tmp', 'data')
+  : path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
 const dbPath = path.join(dataDir, 'mgm.sqlite');
-const db = new DatabaseSync(dbPath);
+const db = new Database(dbPath);
 
 // Enable WAL mode & busy timeout for production concurrency and crash resistance
 try {

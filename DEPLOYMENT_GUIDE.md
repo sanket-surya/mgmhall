@@ -10,48 +10,34 @@ This project is fully production-ready with:
 
 ---
 
-## 🌐 Option 1: Free Cloud Deployment (Render.com / Railway) — Recommended
-This gives you an official live **HTTPS** link that faculty members can open on mobile or desktop anywhere.
+## 🌐 Option 1: Vercel Deployment (Super Fast & Free) — Recommended
+Vercel वरून थेट एका क्लिकमध्ये लाईव्ह लिंक मिळते जी सीनियर किंवा प्राध्यापकांना लगेच शेअर करता येते.
 
-### Step 1: Initialize Git and Push to GitHub
-Open PowerShell in `C:\Users\Asus\Desktop\mgm` and run:
-```powershell
-git init
-git add .
-git commit -m "MGM College of Engineering Nanded Hall Booking System"
-git branch -M main
-```
-Create a new repository on your GitHub (e.g. `mgmcen-hall-booking`) and run:
-```powershell
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/mgmcen-hall-booking.git
-git push -u origin main
-```
+### Vercel वर Deploy कसे करावे:
+1. कोड GitHub वर पुश करा:
+   ```bash
+   git add .
+   git commit -m "Update: Better-sqlite3 and Vercel serverless support"
+   git push origin main
+   ```
+2. [vercel.com](https://vercel.com) वर जा आणि तुमच्या GitHub ने Login करा.
+3. **"Add New..."** ➡️ **"Project"** वर क्लिक करा.
+4. तुमची GitHub रिपॉझिटरी (`sanket-surya/mgmhall`) शोधा आणि **"Import"** वर क्लिक करा.
+5. `vercel.json` आधीच कॉन्फिगर केलेला आहे, त्यामुळे कोणतीही अतिरिक्त सेटिंग न बदलता फक्त **"Deploy"** बटण दाबा.
+6. अवघ्या १ मिनिटात तुम्हाला लाईव्ह लिंक मिळेल:
+   `https://mgmhall.vercel.app` (किंवा तत्सम)
 
-### Step 2: Deploy on Render (Free)
-1. Go to [render.com](https://render.com) and sign in.
-2. Click **New +** -> **Web Service**.
-3. Select your GitHub repository (`mgmcen-hall-booking`).
-4. Settings:
-   - **Environment:** `Node`
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-5. **CRITICAL Environment Variables (Add under "Environment" tab):**
-   - `NODE_VERSION` = `22` *(Mandatory for built-in SQLite engine)*
-   - `NODE_ENV` = `production`
-   - `SESSION_SECRET` = *(Any random string, e.g. `mgm_nanded_secret_2026`)*
-   - `ADMIN_EMAIL` = `s25_suryawanshi_sanket@mgmcen.ac.in`
-   - `ADMIN_PASSWORD` = `Sanket@123`
-6. **Data Persistence (Disks tab - Recommended):**
-   - Render's root file system is ephemeral on free tier. To keep the database (`mgm.sqlite`) and Excel files permanently safe across restarts:
-   - Go to **Disks** tab -> **Add Disk** -> Mount Path: `/opt/render/project/src/data` (Size: 1 GB is plenty).
-7. **Keep-Alive (Prevent Free-Tier Sleep):**
-   - We added a lightweight `/api/health` endpoint.
-   - You can enter `https://your-app.onrender.com/api/health` into a free monitor like [cron-job.org](https://cron-job.org) or [uptimerobot.com](https://uptimerobot.com) (every 10 minutes) so your website NEVER goes to sleep and opens instantly for all professors!
-8. Click **Deploy Web Service**.
-9. Within 2 minutes, you will receive an official live HTTPS URL:
+---
+
+## 🌐 Option 2: Render.com Deployment (Fixed & Production Ready)
+पूर्वी Render वर आलेली त्रुटी (`Error [ERR_UNKNOWN_BUILTIN_MODULE]: node:sqlite`) पूर्णपणे सोडवण्यात आली आहे. आता प्रोजेक्टमध्ये `better-sqlite3` वापरण्यात आला आहे, जो Render वर सुरळीत चालतो.
+
+### Render वर Deploy कसे करावे:
+1. कोड GitHub वर पुश करा (`git push origin main`).
+2. Render Dashboard मध्ये तुमच्या `mgmcen-hall-booking` सेवेवर जा.
+3. **"Manual Deploy"** ➡️ **"Deploy latest commit"** वर क्लिक करा (किंवा Git push मुळे आपोआप डिप्लॉय सुरू होईल).
+4. आता कोणताही एरर न येता बिल्ड व रन पूर्ण यशस्वी होईल:
    `https://mgmcen-hall-booking.onrender.com`
-
-*(You can also map a custom domain like `booking.mgmcen.ac.in` under Render's Custom Domains tab).*
 
 ---
 

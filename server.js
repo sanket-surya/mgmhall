@@ -922,7 +922,12 @@ process.on('uncaughtException', () => {
   // Gracefully prevent sudden process exits
 });
 
-// Start Server
-app.listen(PORT, '0.0.0.0', () => {
-  process.stdout.write(`MGM Nanded Portal running on port ${PORT}\n`);
-});
+// Start Server (skip on Vercel - it handles this automatically)
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    process.stdout.write(`MGM Nanded Portal running on port ${PORT}\n`);
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;
