@@ -155,6 +155,39 @@
         </div>
       </div>
 
+      <!-- Faculty & Authority Role Management Card -->
+      <div class="card" style="margin-bottom: 28px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="margin: 0;"><i class="fas fa-user-shield" style="color: var(--accent);"></i> Faculty & Authority Role Management (प्रशासकीय अधिकार व फॅकल्टी मॅनेजमेंट)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0;">
+              Technical Head can grant or revoke Administrator privileges for professors and department in-charges.
+            </p>
+          </div>
+          <button class="btn btn-outline-dark btn-sm" onclick="loadAllFaculty()">
+            <i class="fas fa-sync-alt"></i> Refresh List
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Personnel Name</th>
+                <th>Official Email</th>
+                <th>Department / Branch</th>
+                <th>Faculty ID</th>
+                <th>Account Status</th>
+                <th>Current Role</th>
+                <th>Authority Action</th>
+              </tr>
+            </thead>
+            <tbody id="allFacultyTableBody">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading faculty directory...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- All Bookings Approval Table -->
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">

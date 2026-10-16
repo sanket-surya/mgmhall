@@ -283,6 +283,7 @@ async function loadAdminDashboard() {
   await Promise.all([
     loadAdminStats(),
     loadPendingFaculty(),
+    loadAllFaculty(),
     loadAdminBookings(),
     loadFacultySecretKey()
   ]);
@@ -396,6 +397,101 @@ async function rejectFaculty(userId, facultyName) {
     }
   } catch (e) {
     showDashboardAlert('Network issue rejecting faculty.', 'danger');
+  }
+}
+
+// Load all registered faculty & administrators for role management
+async function loadAllFaculty() {
+  try {
+    const res = await fetch('/api/admin/faculty/all', { credentials: 'include' });
+    const data = await res.json();
+
+    const tbody = document.getElementById('allFacultyTableBody');
+    if (!tbody) return;
+
+    if (res.ok && data.success) {
+      if (!data.faculty || data.faculty.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">No registered personnel found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.faculty.map(f => {
+        const isPrimaryHead = f.email.toLowerCase() === 's25_suryawanshi_sanket@mgmcen.ac.in';
+        const isAdmin = f.role === 'admin';
+
+        let roleBadge = isPrimaryHead
+          ? '<span class="badge" style="background: #ecfdf5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0;"><i class="fas fa-crown"></i> Technical Head</span>'
+          : isAdmin
+            ? '<span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 700;"><i class="fas fa-user-shield"></i> Administrator</span>'
+            : '<span class="badge" style="background: #f1f5f9; color: #475569; font-weight: 600;"><i class="fas fa-chalkboard-teacher"></i> Faculty</span>';
+
+        let statusBadge = f.status === 'approved'
+          ? '<span class="status-badge status-approved">Approved</span>'
+          : `<span class="status-badge status-${f.status || 'pending'}">${(f.status || 'pending').toUpperCase()}</span>`;
+
+        let actionHtml = '';
+        if (isPrimaryHead) {
+          actionHtml = '<small style="color: var(--text-muted); font-weight: 600;">Permanent Primary Admin</small>';
+        } else if (isAdmin) {
+          actionHtml = `
+            <button class="btn btn-outline-dark btn-sm" onclick="toggleAdminRole(${f.id}, '${f.name.replace(/'/g, "\\'")}', 'faculty')" title="Revoke Admin Access (सामान्य शिक्षक बनवा)">
+              <i class="fas fa-user-minus" style="color: #dc2626;"></i> Remove Admin
+            </button>
+          `;
+        } else {
+          actionHtml = `
+            <button class="btn btn-primary btn-sm" onclick="toggleAdminRole(${f.id}, '${f.name.replace(/'/g, "\\'")}', 'admin')" title="Grant Full Administrator Privileges (ॲडमिन अधिकार द्या)">
+              <i class="fas fa-user-shield"></i> Make Admin
+            </button>
+          `;
+        }
+
+        return `
+          <tr>
+            <td><strong>${f.name}</strong></td>
+            <td><a href="mailto:${f.email}" style="color: var(--primary); text-decoration: underline;">${f.email}</a></td>
+            <td><span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 0.78rem;">${f.department}</span></td>
+            <td><code>${f.faculty_id}</code></td>
+            <td>${statusBadge}</td>
+            <td>${roleBadge}</td>
+            <td>${actionHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (e) {
+    showDashboardAlert('System issue loading faculty directory.', 'danger');
+  }
+}
+
+// Toggle between Administrator and Faculty role
+async function toggleAdminRole(userId, userName, newRole) {
+  const isPromote = newRole === 'admin';
+  const confirmMsg = isPromote
+    ? `${userName} यांना Administrator (प्रशासकीय अधिकार) द्यायचे आहेत का? यानंतर ते सर्व हॉल बुकिंग्ज मंजूर किंवा नाकारू शकतील.`
+    : `${userName} यांचे प्रशासकीय अधिकार काढून त्यांना सामान्य Faculty करायचे आहे का?`;
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ role: newRole })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showDashboardAlert(data.message, 'success');
+      await Promise.all([loadAllFaculty(), loadAdminStats()]);
+    } else {
+      showDashboardAlert(data.message || 'System issue updating role.', 'danger');
+    }
+  } catch (e) {
+    showDashboardAlert('Network issue updating role.', 'danger');
   }
 }
 

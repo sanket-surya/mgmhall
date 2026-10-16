@@ -743,14 +743,13 @@ app.get('/api/admin/faculty/pending', requireAdmin, async (req, res) => {
   }
 });
 
-// Admin: Get all faculty members
+// Admin: Get all faculty members & co-admins for role management
 app.get('/api/admin/faculty/all', requireAdmin, async (req, res) => {
   try {
     const stmt = db.prepare(`
-      SELECT id, name, email, department, faculty_id, phone, status, created_at
+      SELECT id, name, email, department, faculty_id, phone, status, role, created_at
       FROM users
-      WHERE role = 'faculty'
-      ORDER BY created_at DESC
+      ORDER BY (CASE WHEN email = 's25_suryawanshi_sanket@mgmcen.ac.in' THEN 0 WHEN role = 'admin' THEN 1 ELSE 2 END), created_at DESC
     `);
     const faculty = await stmt.all();
     return res.json({ success: true, faculty });
@@ -758,6 +757,55 @@ app.get('/api/admin/faculty/all', requireAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'System issue. Please try again later.'
+    });
+  }
+});
+
+// Admin: Update user role (Promote to Admin / Demote to Faculty)
+app.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const { role } = req.body;
+
+    if (!['admin', 'faculty'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'System issue: Invalid role parameter.'
+      });
+    }
+
+    const targetUser = await db.prepare('SELECT * FROM users WHERE id = ?').get(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'System issue: User record not found.'
+      });
+    }
+
+    // Safety: Protect primary technical head admin from being demoted
+    if (targetUser.email.toLowerCase() === 's25_suryawanshi_sanket@mgmcen.ac.in' && role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'System issue: Primary Technical Head Administrator account cannot be demoted.'
+      });
+    }
+
+    await db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, targetUserId);
+
+    // Sync updated status to Faculty Excel sheet
+    try {
+      const allFaculty = await db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      syncFacultyToExcel(allFaculty);
+    } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: `${targetUser.name} यांना ${role === 'admin' ? 'Administrator (प्रशासकीय अधिकार)' : 'Faculty (शिक्षक)'} यशस्वीरित्या नियुक्त करण्यात आले आहे.`
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'System issue updating user role.'
     });
   }
 });
