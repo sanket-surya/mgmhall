@@ -4,19 +4,19 @@ const db = require('./db');
 /**
  * Retrieves current SMTP configuration from database
  */
-function getSmtpConfig() {
+async function getSmtpConfig() {
   try {
-    const getSetting = (key, defaultVal = '') => {
-      const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get(key);
+    const getSetting = async (key, defaultVal = '') => {
+      const row = await db.prepare('SELECT value FROM system_settings WHERE key = ?').get(key);
       return row ? row.value : defaultVal;
     };
 
     return {
-      host: getSetting('smtp_host', 'smtp.gmail.com'),
-      port: parseInt(getSetting('smtp_port', '587'), 10),
-      user: getSetting('smtp_user', ''),
-      pass: getSetting('smtp_pass', ''),
-      senderName: getSetting('smtp_sender_name', "MGM's College Of Engineering Nanded")
+      host: await getSetting('smtp_host', 'smtp.gmail.com'),
+      port: parseInt(await getSetting('smtp_port', '587'), 10),
+      user: await getSetting('smtp_user', ''),
+      pass: await getSetting('smtp_pass', ''),
+      senderName: await getSetting('smtp_sender_name', "MGM's College Of Engineering Nanded")
     };
   } catch (e) {
     return {
@@ -98,7 +98,7 @@ function generateEmailHtml(title, subtitle, contentHtml, badgeText = 'OFFICIAL N
  * 1. Send Booking Request Confirmation (To Faculty & Admin)
  */
 async function sendBookingRequestNotification(booking, userEmail) {
-  const config = getSmtpConfig();
+  const config = await getSmtpConfig();
   const transporter = createTransporter(config);
   if (!transporter) return { success: false, reason: 'SMTP credentials not configured yet' };
 
@@ -145,7 +145,7 @@ async function sendBookingRequestNotification(booking, userEmail) {
  * 2. Send Booking Status Update (Approved or Rejected)
  */
 async function sendBookingStatusNotification(booking, status, remarks = '') {
-  const config = getSmtpConfig();
+  const config = await getSmtpConfig();
   const transporter = createTransporter(config);
   if (!transporter) return { success: false, reason: 'SMTP not configured' };
 
@@ -197,7 +197,7 @@ async function sendBookingStatusNotification(booking, status, remarks = '') {
  * 3. Send Upcoming Event Reminder (24h or On-Demand)
  */
 async function sendEventReminderNotification(booking) {
-  const config = getSmtpConfig();
+  const config = await getSmtpConfig();
   const transporter = createTransporter(config);
   if (!transporter) return { success: false, reason: 'SMTP not configured' };
 
@@ -243,7 +243,7 @@ async function sendEventReminderNotification(booking) {
  * 4. Send Faculty Registration Approval Notification
  */
 async function sendFacultyApprovedNotification(user) {
-  const config = getSmtpConfig();
+  const config = await getSmtpConfig();
   const transporter = createTransporter(config);
   if (!transporter) return { success: false, reason: 'SMTP not configured' };
 

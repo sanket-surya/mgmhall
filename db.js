@@ -1,30 +1,101 @@
+require('dotenv').config();
+const { createClient } = require('@libsql/client');
 const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Use /tmp on Vercel (read-only filesystem), local ./data otherwise
-const dataDir = process.env.VERCEL
-  ? path.join('/tmp', 'data')
-  : path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const TURSO_URL = process.env.TURSO_DATABASE_URL;
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
+
+let db;
+
+if (TURSO_URL && TURSO_TOKEN) {
+  console.log('[DATABASE] Connecting to Turso Cloud Database:', TURSO_URL);
+  const client = createClient({
+    url: TURSO_URL,
+    authToken: TURSO_TOKEN
+  });
+
+  db = {
+    isCloud: true,
+    async exec(sql) {
+      const statements = sql
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      for (const s of statements) {
+        await client.execute(s);
+      }
+    },
+    prepare(sql) {
+      return {
+        async get(...params) {
+          const args = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+          const rs = await client.execute({ sql, args });
+          return rs.rows[0] ? Object.assign({}, rs.rows[0]) : undefined;
+        },
+        async all(...params) {
+          const args = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+          const rs = await client.execute({ sql, args });
+          return Array.from(rs.rows).map(r => Object.assign({}, r));
+        },
+        async run(...params) {
+          const args = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+          const rs = await client.execute({ sql, args });
+          return {
+            changes: rs.rowsAffected,
+            lastInsertRowid: Number(rs.lastInsertRowid || 0)
+          };
+        }
+      };
+    }
+  };
+} else {
+  console.log('[DATABASE] Using local SQLite file storage');
+  const dataDir = process.env.VERCEL
+    ? path.join('/tmp', 'data')
+    : path.join(__dirname, 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  const dbPath = path.join(dataDir, 'mgm.sqlite');
+  const localDb = new Database(dbPath);
+
+  try {
+    localDb.exec('PRAGMA journal_mode = WAL;');
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA synchronous = NORMAL;');
+  } catch (e) {}
+
+  db = {
+    isCloud: false,
+    async exec(sql) {
+      localDb.exec(sql);
+    },
+    prepare(sql) {
+      const stmt = localDb.prepare(sql);
+      return {
+        async get(...params) {
+          const args = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+          return stmt.get(...args);
+        },
+        async all(...params) {
+          const args = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+          return stmt.all(...args);
+        },
+        async run(...params) {
+          const args = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+          return stmt.run(...args);
+        }
+      };
+    }
+  };
 }
 
-const dbPath = path.join(dataDir, 'mgm.sqlite');
-const db = new Database(dbPath);
-
-// Enable WAL mode & busy timeout for production concurrency and crash resistance
-try {
-  db.exec('PRAGMA journal_mode = WAL;');
-  db.exec('PRAGMA busy_timeout = 5000;');
-  db.exec('PRAGMA synchronous = NORMAL;');
-} catch (e) {
-  // Pragma fallback
-}
-
-function initDatabase() {
-  db.exec(`
+async function initDatabase() {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS system_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -87,31 +158,25 @@ function initDatabase() {
     );
   `);
 
-  // Ensure 'status' column exists in users table (migration for existing database)
   try {
-    db.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'approved'");
-  } catch (e) {
-    // Column already exists
-  }
-  db.exec("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = ''");
+    await db.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'approved'");
+  } catch (e) {}
 
-  // Initialize faculty secret key
-  const getSetting = db.prepare('SELECT value FROM system_settings WHERE key = ?');
-  const secretKeySetting = getSetting.get('faculty_secret_key');
+  await db.exec("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = ''");
+
+  // Faculty Secret Key
+  const secretKeySetting = await db.prepare('SELECT value FROM system_settings WHERE key = ?').get('faculty_secret_key');
   if (!secretKeySetting) {
-    const insertSetting = db.prepare('INSERT INTO system_settings (key, value) VALUES (?, ?)');
-    insertSetting.run('faculty_secret_key', 'MGM@FACULTY#2025');
+    await db.prepare('INSERT INTO system_settings (key, value) VALUES (?, ?)').run('faculty_secret_key', 'MGM@FACULTY#2025');
   }
 
-  // Pre-seed or ensure Sir Vishveshwarya Conference Hall is Hall ID 1
-  const countHalls = db.prepare('SELECT COUNT(*) as count FROM halls').get();
-  if (countHalls.count === 0) {
-    const insertHall = db.prepare(`
+  // Pre-seed Hall 1
+  const countHalls = await db.prepare('SELECT COUNT(*) as count FROM halls').get();
+  if (!countHalls || Number(countHalls.count) === 0) {
+    await db.prepare(`
       INSERT INTO halls (id, name, code, capacity, location, amenities, image_url)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    insertHall.run(
+    `).run(
       1,
       'Sir Vishveshwarya Conference Hall',
       'MGM-SVCH-01',
@@ -121,8 +186,7 @@ function initDatabase() {
       '/images/auditorium.jpg'
     );
   } else {
-    // Update Hall 1 to be Sir Vishveshwarya Conference Hall
-    db.prepare(`
+    await db.prepare(`
       UPDATE halls 
       SET name = 'Sir Vishveshwarya Conference Hall',
           code = 'MGM-SVCH-01',
@@ -134,32 +198,29 @@ function initDatabase() {
     `).run();
   }
 
-  // Configurable Admin Credentials (Supports environment variables for deployment):
+  // Admin Account
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 's25_suryawanshi_sanket@mgmcen.ac.in';
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Sanket@123';
-
-  // Ensure Admin account exists or updates with the credentials above
-  const adminRow = db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
+  const adminRow = await db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
   const salt = bcrypt.genSaltSync(10);
   const hashedAdminPass = bcrypt.hashSync(ADMIN_PASSWORD, salt);
 
   if (!adminRow) {
-    const insertAdmin = db.prepare(`
+    await db.prepare(`
       INSERT INTO users (name, email, password, role, department, faculty_id, phone)
       VALUES (?, ?, ?, 'admin', 'Administration', 'MGM-ADM-001', '9876543210')
-    `);
-    insertAdmin.run('Campus Administrator', ADMIN_EMAIL.trim().toLowerCase(), hashedAdminPass);
+    `).run('Campus Administrator', ADMIN_EMAIL.trim().toLowerCase(), hashedAdminPass);
   } else {
-    // Keep updated if changed in this file
-    db.prepare(`
+    await db.prepare(`
       UPDATE users 
       SET email = ?, password = ? 
       WHERE role = 'admin'
     `).run(ADMIN_EMAIL.trim().toLowerCase(), hashedAdminPass);
   }
+
+  console.log('[DATABASE] Database ready. Mode:', db.isCloud ? 'TURSO CLOUD' : 'LOCAL SQLITE');
 }
 
-
-initDatabase();
+db.initPromise = initDatabase();
 
 module.exports = db;

@@ -16,3 +16,7 @@ services:
         value: s25_suryawanshi_sanket@mgmcen.ac.in
       - key: ADMIN_PASSWORD
         value: Sanket@123
+      - key: TURSO_DATABASE_URL
+        value: libsql://mgmhall-db-sanket-surya.aws-ap-south-1.turso.io
+      - key: TURSO_AUTH_TOKEN
+        value: eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTIxNzMwODYsImlkIjoiMDFhMTQ1ZDUtZGYwMS03Zjc5LThjNTUtN2UxMDcyNmVmMWZmIiwia2lkIjoiOF9QZW5xcTZrQ3o3bEp1bXJDYVMyMHBEYUNtQWZkT2JQLXI4blFocXlobyIsInJpZCI6Ijg2Y2ZhZWE3LWY0ZWYtNGU3Yy04YzUwLTgzZmE1YmYxOGU0YSJ9.fy_lBsxzgkMMUnzefmzk2MTv6Y2W9y1kdx_ngkI088MK9CBOlIiwUsJve2ZhAr71-HrMz07yqUB7GFnBBfarCg

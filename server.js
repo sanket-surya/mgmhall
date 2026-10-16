@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
@@ -69,6 +70,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: "MGM's CEN Conference Hall Portal",
+    database: db.isCloud ? 'Turso Cloud (Mumbai)' : 'Local SQLite',
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString()
   });
@@ -79,6 +81,16 @@ app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  next();
+});
+
+// Ensure database tables and initial seeding are ready before handling requests
+app.use(async (req, res, next) => {
+  if (db.initPromise) {
+    try {
+      await db.initPromise;
+    } catch (e) {}
+  }
   next();
 });
 
@@ -129,7 +141,7 @@ app.get('/api/departments', (req, res) => {
 // -------------------------------------------------------------
 
 // Faculty / Staff Registration (Protected by Faculty Key)
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password, department, faculty_id, phone, faculty_key } = req.body;
 
@@ -149,7 +161,7 @@ app.post('/api/auth/register', (req, res) => {
 
     // Faculty Key verification
     const settingStmt = db.prepare('SELECT value FROM system_settings WHERE key = ?');
-    const secretRow = settingStmt.get('faculty_secret_key');
+    const secretRow = await settingStmt.get('faculty_secret_key');
     const expectedKey = secretRow ? secretRow.value : 'MGM@FACULTY#2025';
 
     if (!faculty_key || faculty_key.trim() !== expectedKey.trim()) {
@@ -161,7 +173,7 @@ app.post('/api/auth/register', (req, res) => {
 
     // Check if user already exists
     const checkStmt = db.prepare('SELECT id FROM users WHERE email = ?');
-    const existing = checkStmt.get(email.trim().toLowerCase());
+    const existing = await checkStmt.get(email.trim().toLowerCase());
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -177,7 +189,7 @@ app.post('/api/auth/register', (req, res) => {
       VALUES (?, ?, ?, 'faculty', ?, ?, ?, 'pending')
     `);
 
-    insertStmt.run(
+    await insertStmt.run(
       name.trim(),
       email.trim().toLowerCase(),
       hashedPassword,
@@ -188,7 +200,7 @@ app.post('/api/auth/register', (req, res) => {
 
     // Automatically update Faculty Excel sheet
     try {
-      const allFaculty = db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      const allFaculty = await db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
       syncFacultyToExcel(allFaculty);
     } catch (e) {}
 
@@ -207,7 +219,7 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -219,7 +231,7 @@ app.post('/api/auth/login', (req, res) => {
     }
 
     const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
-    const user = stmt.get(email.trim().toLowerCase());
+    const user = await stmt.get(email.trim().toLowerCase());
 
     if (!user) {
       return res.status(401).json({
@@ -316,10 +328,10 @@ app.get('/api/auth/me', (req, res) => {
 // -------------------------------------------------------------
 
 // Get list of halls
-app.get('/api/halls', (req, res) => {
+app.get('/api/halls', async (req, res) => {
   try {
     const stmt = db.prepare("SELECT * FROM halls WHERE status = 'active' ORDER BY id ASC");
-    const halls = stmt.all();
+    const halls = await stmt.all();
     return res.json({ success: true, halls });
   } catch (err) {
     return res.status(500).json({
@@ -330,7 +342,7 @@ app.get('/api/halls', (req, res) => {
 });
 
 // Get hall availability for a specific date
-app.get('/api/halls/:id/availability', (req, res) => {
+app.get('/api/halls/:id/availability', async (req, res) => {
   try {
     const hallId = req.params.id;
     const date = req.query.date;
@@ -349,7 +361,7 @@ app.get('/api/halls/:id/availability', (req, res) => {
       ORDER BY start_time ASC
     `);
 
-    const bookings = stmt.all(hallId, date);
+    const bookings = await stmt.all(hallId, date);
     return res.json({ success: true, bookings });
   } catch (err) {
     return res.status(500).json({
@@ -364,7 +376,7 @@ app.get('/api/halls/:id/availability', (req, res) => {
 // -------------------------------------------------------------
 
 // Submit a new booking
-app.post('/api/bookings', requireAuth, (req, res) => {
+app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
     const {
       hall_id,
@@ -409,7 +421,7 @@ app.post('/api/bookings', requireAuth, (req, res) => {
         AND NOT (end_time <= ? OR start_time >= ?)
     `);
 
-    const conflict = conflictStmt.get(hall_id, booking_date, start_time, end_time);
+    const conflict = await conflictStmt.get(hall_id, booking_date, start_time, end_time);
 
     if (conflict) {
       return res.status(409).json({
@@ -428,7 +440,7 @@ app.post('/api/bookings', requireAuth, (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
     `);
 
-    insertStmt.run(
+    await insertStmt.run(
       bookingRef,
       hall_id,
       req.session.user.id,
@@ -470,7 +482,7 @@ app.post('/api/bookings', requireAuth, (req, res) => {
 });
 
 // Get user's own bookings
-app.get('/api/bookings/my', requireAuth, (req, res) => {
+app.get('/api/bookings/my', requireAuth, async (req, res) => {
   try {
     const stmt = db.prepare(`
       SELECT b.*, h.name as hall_name, h.location as hall_location
@@ -480,7 +492,7 @@ app.get('/api/bookings/my', requireAuth, (req, res) => {
       ORDER BY b.booking_date DESC, b.start_time DESC
     `);
 
-    const bookings = stmt.all(req.session.user.id);
+    const bookings = await stmt.all(req.session.user.id);
     return res.json({ success: true, bookings });
   } catch (err) {
     return res.status(500).json({
@@ -491,7 +503,7 @@ app.get('/api/bookings/my', requireAuth, (req, res) => {
 });
 
 // Admin: Get all bookings
-app.get('/api/bookings/all', requireAdmin, (req, res) => {
+app.get('/api/bookings/all', requireAdmin, async (req, res) => {
   try {
     const stmt = db.prepare(`
       SELECT b.*, h.name as hall_name, h.location as hall_location, u.faculty_id, u.phone
@@ -501,7 +513,7 @@ app.get('/api/bookings/all', requireAdmin, (req, res) => {
       ORDER BY b.booking_date DESC, b.start_time DESC
     `);
 
-    const bookings = stmt.all();
+    const bookings = await stmt.all();
     return res.json({ success: true, bookings });
   } catch (err) {
     return res.status(500).json({
@@ -512,7 +524,7 @@ app.get('/api/bookings/all', requireAdmin, (req, res) => {
 });
 
 // Admin: Update booking status (Approved / Rejected) -> AUTO EXCEL SYNC
-app.patch('/api/bookings/:id/status', requireAdmin, (req, res) => {
+app.patch('/api/bookings/:id/status', requireAdmin, async (req, res) => {
   try {
     const { status, admin_remarks } = req.body;
     const bookingId = req.params.id;
@@ -530,10 +542,10 @@ app.patch('/api/bookings/:id/status', requireAdmin, (req, res) => {
       WHERE id = ?
     `);
 
-    stmt.run(status, admin_remarks || '', bookingId);
+    await stmt.run(status, admin_remarks || '', bookingId);
 
     // Query booking detail with faculty email
-    const bookingDetail = db.prepare(`
+    const bookingDetail = await db.prepare(`
       SELECT b.*, h.name as hall_name, u.email
       FROM bookings b
       JOIN halls h ON b.hall_id = h.id
@@ -551,7 +563,7 @@ app.patch('/api/bookings/:id/status', requireAdmin, (req, res) => {
         WHERE b.status = 'Approved'
         ORDER BY b.booking_date DESC, b.start_time DESC
       `);
-      const allApproved = approvedQuery.all();
+      const allApproved = await approvedQuery.all();
       syncApprovedBookingsToExcel(allApproved);
     }
 
@@ -575,7 +587,7 @@ app.patch('/api/bookings/:id/status', requireAdmin, (req, res) => {
 // Admin: Send on-demand event reminder email
 app.post('/api/bookings/:id/remind', requireAdmin, async (req, res) => {
   try {
-    const booking = db.prepare(`
+    const booking = await db.prepare(`
       SELECT b.*, h.name as hall_name, u.email
       FROM bookings b
       JOIN halls h ON b.hall_id = h.id
@@ -606,9 +618,9 @@ app.post('/api/bookings/:id/remind', requireAdmin, async (req, res) => {
 });
 
 // Admin: Get SMTP configuration
-app.get('/api/admin/smtp', requireAdmin, (req, res) => {
+app.get('/api/admin/smtp', requireAdmin, async (req, res) => {
   try {
-    const config = getSmtpConfig();
+    const config = await getSmtpConfig();
     return res.json({
       success: true,
       config: {
@@ -625,20 +637,20 @@ app.get('/api/admin/smtp', requireAdmin, (req, res) => {
 });
 
 // Admin: Update SMTP configuration
-app.post('/api/admin/smtp', requireAdmin, (req, res) => {
+app.post('/api/admin/smtp', requireAdmin, async (req, res) => {
   try {
     const { host, port, user, pass, senderName } = req.body;
 
-    const setSetting = (key, val) => {
+    const setSetting = async (key, val) => {
       const stmt = db.prepare('INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?');
-      stmt.run(key, val, val);
+      await stmt.run(key, val, val);
     };
 
-    if (host) setSetting('smtp_host', host.trim());
-    if (port) setSetting('smtp_port', String(port).trim());
-    if (user) setSetting('smtp_user', user.trim());
-    if (pass) setSetting('smtp_pass', pass.trim());
-    if (senderName) setSetting('smtp_sender_name', senderName.trim());
+    if (host) await setSetting('smtp_host', host.trim());
+    if (port) await setSetting('smtp_port', String(port).trim());
+    if (user) await setSetting('smtp_user', user.trim());
+    if (pass) await setSetting('smtp_pass', pass.trim());
+    if (senderName) await setSetting('smtp_sender_name', senderName.trim());
 
     return res.json({
       success: true,
@@ -650,7 +662,7 @@ app.post('/api/admin/smtp', requireAdmin, (req, res) => {
 });
 
 // Admin: Export/Download Excel Sheet directly
-app.get('/api/admin/export-excel', requireAdmin, (req, res) => {
+app.get('/api/admin/export-excel', requireAdmin, async (req, res) => {
   try {
     const approvedQuery = db.prepare(`
       SELECT b.*, h.name as hall_name, h.location as hall_location, u.faculty_id, u.phone
@@ -660,7 +672,7 @@ app.get('/api/admin/export-excel', requireAdmin, (req, res) => {
       WHERE b.status = 'Approved'
       ORDER BY b.booking_date DESC, b.start_time DESC
     `);
-    const allApproved = approvedQuery.all();
+    const allApproved = await approvedQuery.all();
     syncApprovedBookingsToExcel(allApproved);
 
     const filePath = getExcelFilePath();
@@ -681,9 +693,9 @@ app.get('/api/admin/export-excel', requireAdmin, (req, res) => {
 });
 
 // Admin: Export/Download Registered Faculty List directly as Excel (.xlsx)
-app.get('/api/admin/export-faculty-excel', requireAdmin, (req, res) => {
+app.get('/api/admin/export-faculty-excel', requireAdmin, async (req, res) => {
   try {
-    const allFaculty = db.prepare(`
+    const allFaculty = await db.prepare(`
       SELECT * FROM users 
       WHERE role = 'faculty'
       ORDER BY department ASC, name ASC
@@ -713,7 +725,7 @@ app.get('/api/admin/export-faculty-excel', requireAdmin, (req, res) => {
 // -------------------------------------------------------------
 
 // Admin: Get all pending faculty registrations
-app.get('/api/admin/faculty/pending', requireAdmin, (req, res) => {
+app.get('/api/admin/faculty/pending', requireAdmin, async (req, res) => {
   try {
     const stmt = db.prepare(`
       SELECT id, name, email, department, faculty_id, phone, status, created_at
@@ -721,7 +733,7 @@ app.get('/api/admin/faculty/pending', requireAdmin, (req, res) => {
       WHERE role = 'faculty' AND status = 'pending'
       ORDER BY created_at DESC
     `);
-    const pendingFaculty = stmt.all();
+    const pendingFaculty = await stmt.all();
     return res.json({ success: true, pendingFaculty });
   } catch (err) {
     return res.status(500).json({
@@ -732,7 +744,7 @@ app.get('/api/admin/faculty/pending', requireAdmin, (req, res) => {
 });
 
 // Admin: Get all faculty members
-app.get('/api/admin/faculty/all', requireAdmin, (req, res) => {
+app.get('/api/admin/faculty/all', requireAdmin, async (req, res) => {
   try {
     const stmt = db.prepare(`
       SELECT id, name, email, department, faculty_id, phone, status, created_at
@@ -740,7 +752,7 @@ app.get('/api/admin/faculty/all', requireAdmin, (req, res) => {
       WHERE role = 'faculty'
       ORDER BY created_at DESC
     `);
-    const faculty = stmt.all();
+    const faculty = await stmt.all();
     return res.json({ success: true, faculty });
   } catch (err) {
     return res.status(500).json({
@@ -754,7 +766,7 @@ app.get('/api/admin/faculty/all', requireAdmin, (req, res) => {
 app.patch('/api/admin/faculty/:id/approve', requireAdmin, async (req, res) => {
   try {
     const facultyId = req.params.id;
-    const user = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'faculty'").get(facultyId);
+    const user = await db.prepare("SELECT * FROM users WHERE id = ? AND role = 'faculty'").get(facultyId);
 
     if (!user) {
       return res.status(404).json({
@@ -763,11 +775,11 @@ app.patch('/api/admin/faculty/:id/approve', requireAdmin, async (req, res) => {
       });
     }
 
-    db.prepare("UPDATE users SET status = 'approved' WHERE id = ?").run(facultyId);
+    await db.prepare("UPDATE users SET status = 'approved' WHERE id = ?").run(facultyId);
 
     // Sync updated status to Faculty Excel sheet
     try {
-      const allFaculty = db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      const allFaculty = await db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
       syncFacultyToExcel(allFaculty);
     } catch (e) {}
 
@@ -787,10 +799,10 @@ app.patch('/api/admin/faculty/:id/approve', requireAdmin, async (req, res) => {
 });
 
 // Admin: Reject faculty registration
-app.patch('/api/admin/faculty/:id/reject', requireAdmin, (req, res) => {
+app.patch('/api/admin/faculty/:id/reject', requireAdmin, async (req, res) => {
   try {
     const facultyId = req.params.id;
-    const user = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'faculty'").get(facultyId);
+    const user = await db.prepare("SELECT * FROM users WHERE id = ? AND role = 'faculty'").get(facultyId);
 
     if (!user) {
       return res.status(404).json({
@@ -799,11 +811,11 @@ app.patch('/api/admin/faculty/:id/reject', requireAdmin, (req, res) => {
       });
     }
 
-    db.prepare("UPDATE users SET status = 'rejected' WHERE id = ?").run(facultyId);
+    await db.prepare("UPDATE users SET status = 'rejected' WHERE id = ?").run(facultyId);
 
     // Sync updated status to Faculty Excel sheet
     try {
-      const allFaculty = db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
+      const allFaculty = await db.prepare("SELECT * FROM users WHERE role = 'faculty' ORDER BY department ASC, name ASC").all();
       syncFacultyToExcel(allFaculty);
     } catch (e) {}
 
@@ -824,26 +836,26 @@ app.patch('/api/admin/faculty/:id/reject', requireAdmin, (req, res) => {
 // -------------------------------------------------------------
 
 // Admin Dashboard Analytics
-app.get('/api/admin/stats', requireAdmin, (req, res) => {
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
   try {
-    const totalBookings = db.prepare('SELECT COUNT(*) as count FROM bookings').get().count;
-    const pendingBookings = db.prepare("SELECT COUNT(*) as count FROM bookings WHERE status = 'Pending'").get().count;
-    const approvedBookings = db.prepare("SELECT COUNT(*) as count FROM bookings WHERE status = 'Approved'").get().count;
-    const totalFaculty = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'faculty'").get().count;
-    const pendingFaculty = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'faculty' AND status = 'pending'").get().count;
-    const approvedFaculty = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'faculty' AND status = 'approved'").get().count;
-    const totalHalls = db.prepare("SELECT COUNT(*) as count FROM halls WHERE status = 'active'").get().count;
+    const totalBookingsRow = await db.prepare('SELECT COUNT(*) as count FROM bookings').get();
+    const pendingBookingsRow = await db.prepare("SELECT COUNT(*) as count FROM bookings WHERE status = 'Pending'").get();
+    const approvedBookingsRow = await db.prepare("SELECT COUNT(*) as count FROM bookings WHERE status = 'Approved'").get();
+    const totalFacultyRow = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'faculty'").get();
+    const pendingFacultyRow = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'faculty' AND status = 'pending'").get();
+    const approvedFacultyRow = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'faculty' AND status = 'approved'").get();
+    const totalHallsRow = await db.prepare("SELECT COUNT(*) as count FROM halls WHERE status = 'active'").get();
 
     return res.json({
       success: true,
       stats: {
-        totalBookings,
-        pendingBookings,
-        approvedBookings,
-        totalFaculty,
-        pendingFaculty,
-        approvedFaculty,
-        totalHalls
+        totalBookings: totalBookingsRow ? Number(totalBookingsRow.count) : 0,
+        pendingBookings: pendingBookingsRow ? Number(pendingBookingsRow.count) : 0,
+        approvedBookings: approvedBookingsRow ? Number(approvedBookingsRow.count) : 0,
+        totalFaculty: totalFacultyRow ? Number(totalFacultyRow.count) : 0,
+        pendingFaculty: pendingFacultyRow ? Number(pendingFacultyRow.count) : 0,
+        approvedFaculty: approvedFacultyRow ? Number(approvedFacultyRow.count) : 0,
+        totalHalls: totalHallsRow ? Number(totalHallsRow.count) : 0
       }
     });
   } catch (err) {
@@ -855,10 +867,10 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
 });
 
 // Get Faculty Authorization Key (Admin only)
-app.get('/api/admin/faculty-key', requireAdmin, (req, res) => {
+app.get('/api/admin/faculty-key', requireAdmin, async (req, res) => {
   try {
     const stmt = db.prepare('SELECT value FROM system_settings WHERE key = ?');
-    const row = stmt.get('faculty_secret_key');
+    const row = await stmt.get('faculty_secret_key');
     return res.json({
       success: true,
       faculty_key: row ? row.value : 'MGM@FACULTY#2025'
@@ -872,7 +884,7 @@ app.get('/api/admin/faculty-key', requireAdmin, (req, res) => {
 });
 
 // Update Faculty Authorization Key (Admin only)
-app.post('/api/admin/faculty-key', requireAdmin, (req, res) => {
+app.post('/api/admin/faculty-key', requireAdmin, async (req, res) => {
   try {
     const { faculty_key } = req.body;
     if (!faculty_key || faculty_key.trim().length < 5) {
@@ -883,7 +895,7 @@ app.post('/api/admin/faculty-key', requireAdmin, (req, res) => {
     }
 
     const stmt = db.prepare('UPDATE system_settings SET value = ? WHERE key = ?');
-    stmt.run(faculty_key.trim(), 'faculty_secret_key');
+    await stmt.run(faculty_key.trim(), 'faculty_secret_key');
 
     return res.json({
       success: true,
